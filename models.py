@@ -1,105 +1,108 @@
-import os
-import tarfile
-import urllib.request
-from pathlib import Path
+import math
 
 import torch
-from torch.utils.data import Dataset
-from torchvision import transforms
-from PIL import Image
-
-URLS = [
-    ("https://s3.amazonaws.com/fast-ai-imageclas/imagenette2-320.tgz", "imagenette2-320"),
-]
+import torch.nn as nn
+from torchvision.models import resnet18
 
 
-def download_data(root):
-    root = Path(root)
-    root.mkdir(parents=True, exist_ok=True)
-    for url, name in URLS:
-        target = root / name / "train"
-        if target.exists() and any(target.iterdir()):
-            print(f"Using cached {target}")
-            return target
-        tgz = root / f"{name}.tgz"
-        if not tgz.exists():
-            print(f"Downloading {url}")
-            urllib.request.urlretrieve(url, tgz)
-        print(f"Extracting {tgz}")
-        with tarfile.open(tgz, "r:gz") as tf:
-            tf.extractall(root)
-        if target.exists():
-            return target
-    raise RuntimeError("download failed")
+class _SurrogateSpike(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, x):
+        ctx.save_for_backward(x)
+        return (x > 0).float()
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        (x,) = ctx.saved_tensors
+        x = x.clamp(-10.0, 10.0)
+        return grad_output / (1.0 + (math.pi / 2 * x).pow(2))
 
 
-def scan_folder(root):
-    root = Path(root)
-    classes = sorted([d.name for d in root.iterdir() if d.is_dir()])
-    cls_to_idx = {c: i for i, c in enumerate(classes)}
-    paths, labels = [], []
-    for cls in classes:
-        for p in sorted((root / cls).iterdir()):
-            if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".bmp"):
-                paths.append(str(p))
-                labels.append(cls_to_idx[cls])
-    return paths, labels, len(classes)
+def surrogate_spike(x):
+    return _SurrogateSpike.apply(x)
 
 
-class MultiViewTransform:
-    def __init__(self, gt, lt, ng, nl):
-        self.gt = gt
-        self.lt = lt
-        self.ng = ng
-        self.nl = nl
+class LIF(nn.Module):
+    def __init__(self, beta=0.9, threshold=0.5,
+                 thr_min=0.05, thr_max=1.5,
+                 learnable_threshold=False):
+        super().__init__()
+        self.beta = beta
+        self.thr_min = thr_min
+        self.thr_max = thr_max
+        self.learnable_threshold = learnable_threshold
 
-    def __call__(self, img):
-        views = [self.gt(img) for _ in range(self.ng)] + [self.lt(img) for _ in range(self.nl)]
-        return torch.stack(views)
+        t = torch.tensor(float(threshold))
+        if learnable_threshold:
+            self._threshold = nn.Parameter(t)
+        else:
+            self.register_buffer("_threshold", t)
 
+    @property
+    def threshold(self):
+        return self._threshold.clamp(self.thr_min, self.thr_max)
 
-class ImageDataset(Dataset):
-    def __init__(self, root, tf):
-        self.paths, self.labels, self.num_classes = scan_folder(root)
-        self.tf = tf
-        print(f"Found {len(self.paths)} images, {self.num_classes} classes in {root}")
+    def init_leaky(self, shape, device):
+        return torch.zeros(shape, device=device)
 
-    def __len__(self):
-        return len(self.paths)
-
-    def __getitem__(self, i):
-        img = Image.open(self.paths[i]).convert("RGB")
-        return self.tf(img), self.labels[i]
-
-
-def make_train_transforms(size, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
-    normalize = transforms.Normalize(mean, std)
-    g = transforms.Compose([
-        transforms.RandomResizedCrop(size, scale=(0.08, 1.0), antialias=True),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomApply([transforms.ColorJitter(0.4, 0.4, 0.2, 0.1)], p=0.8),
-        transforms.RandomGrayscale(p=0.2),
-        transforms.RandomApply([transforms.GaussianBlur(kernel_size=23, sigma=(0.1, 2.0))], p=0.5),
-        transforms.RandomSolarize(threshold=0.5, p=0.1),
-        transforms.ToTensor(),
-        normalize,
-    ])
-    l = transforms.Compose([
-        transforms.RandomResizedCrop(size, scale=(0.08, 1.0), antialias=True),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomApply([transforms.ColorJitter(0.4, 0.4, 0.2, 0.1)], p=0.8),
-        transforms.RandomGrayscale(p=0.2),
-        transforms.RandomApply([transforms.GaussianBlur(kernel_size=23, sigma=(0.1, 2.0))], p=0.5),
-        transforms.ToTensor(),
-        normalize,
-    ])
-    return g, l
+    def forward(self, x, mem):
+        mem = self.beta * mem + x
+        pre_mem = mem
+        spike = surrogate_spike(mem - self.threshold)
+        mem = mem * (1.0 - spike.detach())
+        return spike, mem, pre_mem
 
 
-def make_probe_transform(size, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
-    return transforms.Compose([
-        transforms.Resize(int(size * 256 / 224), antialias=True),
-        transforms.CenterCrop(size),
-        transforms.ToTensor(),
-        transforms.Normalize(mean, std),
-    ])
+class Encoder(nn.Module):
+    def __init__(self, emb_dim=256, spiking=False):
+        super().__init__()
+        self.spiking = spiking
+        self.probe_mem = False
+        m = resnet18(weights=None)
+        m.conv1 = nn.Conv2d(3, 64, 3, 1, 1, bias=False)
+        m.maxpool = nn.Identity()
+        self.body = nn.Sequential(
+            m.conv1, m.bn1, m.relu, m.maxpool,
+            m.layer1, m.layer2, m.layer3, m.layer4, m.avgpool,
+        )
+        self.fc = nn.Linear(512, emb_dim)
+        self.fc_norm = nn.LayerNorm(emb_dim)
+        if spiking:
+            self.lif = LIF(beta=0.9, threshold=0.5, learnable_threshold=True)
+
+    def forward(self, x):
+        h = self.fc(self.body(x).flatten(1))
+        h = self.fc_norm(h)
+        if self.spiking:
+            mem = self.lif.init_leaky(h.shape, h.device)
+            spike, mem, pre_mem = self.lif(h, mem)
+            if self.probe_mem:
+                return pre_mem
+            return spike
+        return h
+
+
+class Projector(nn.Module):
+    def __init__(self, in_dim, hidden, out_dim, spiking=False):
+        super().__init__()
+        self.spiking = spiking
+        self.net = nn.Sequential(
+            nn.Linear(in_dim, hidden),
+            nn.ReLU(inplace=True),
+            nn.Linear(hidden, hidden),
+            nn.ReLU(inplace=True),
+            nn.Linear(hidden, hidden),
+            nn.ReLU(inplace=True),
+            nn.Linear(hidden, out_dim),
+        )
+        self.out_norm = nn.LayerNorm(out_dim)
+        if spiking:
+            self.lif = LIF(beta=0.9, threshold=0.5, learnable_threshold=True)
+
+    def forward(self, x):
+        h = self.net(x)
+        h = self.out_norm(h)
+        if self.spiking:
+            mem = self.lif.init_leaky(h.shape, h.device)
+            h, _, _ = self.lif(h, mem)
+        return h
