@@ -1,0 +1,181 @@
+
+
+
+%!TeX encoding = UTF-8 Unicode
+%!TeX spellcheck = en
+%!BIB TS-program = biber
+% -*- coding: UTF-8; -*-
+% vim: set fenc=utf-8
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% COSYNE-2007 Abstract Template
+%%% Version 1.0
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+\newcommand{\citep}[1]{\cite{#1}}
+\documentclass[12pt]{article}
+% \documentclass[12pt,draft]{article}
+\usepackage{times}
+\usepackage{graphicx}
+\usepackage[sorting=none,style=numeric,maxnames=2]{biblatex}
+\usepackage{floatrow}
+\usepackage[outercaption]{sidecap}
+\usepackage[colorlinks,citecolor=black,urlcolor=red,bookmarks=false,hypertexnames=true]{hyperref}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage[font=footnotesize]{caption}
+
+
+\pagestyle{empty}
+\addbibresource{biblio.bib}
+%
+% \newcommand{\tab}{\hspace{5mm}}
+%
+\usepackage{geometry}
+\geometry{a4paper, portrait, margin=0.5in}
+\parindent 0pt
+%\parskip 12pt
+%
+%
+\newcommand*{\nolink}[1]{%
+    {\protect\NoHyper#1\protect\endNoHyper}%
+}
+\usepackage{tikz}
+\flushbottom \sloppy
+\pagestyle{empty}        % No page numbers
+
+\begin{document}
+\begin{NoHyper}
+    %%%----------------------------------------------------------------- 
+    {\LARGE
+        Bio-plausible statistical regularizer for spiking JEPA
+    }
+    \vspace{3pt}
+
+    {\bf Anonymous submission for double-blind review}
+
+    %%%----------------------------------------------------------------- 
+    \vspace{3pt}
+    \hrule
+    \vspace{3pt}
+    Cortical circuits learn from mostly unlabeled input, a regime that self-supervised models such as joint embedding predictive architectures (JEPA) capture by predicting the latent representation of one view from another. These models can fail through representational collapse, where activity becomes the same for all inputs. Thus, a circuit that learns without labels needs a mechanism that keeps population activity informative using only locally available information. Existing solutions are either heuristic (stop-gradient, moving-average teachers), unstable and without mathematical guarantees, or statistical regularizers whose optimality arguments are built for continuous activity and do not directly apply to discrete spikes. Therefore, it remains unclear whether collapse can be avoided in spiking populations using only locally available statistics.
+    We approach the problem mathematically. For linear decoding, the first and second moments of the latent code determine how well a downstream decoder can perform, so the optimal code can be characterized entirely at the level of these statistics. Existing regularizers such as VICReg act on exactly these statistics. We prove that this optimality extends to binary latents under a sparsity constraint, and that the optimum is reached if and only if units are mutually uncorrelated and fire at the same rate. Our analysis shows that the same statistics can prevent collapse in self-supervised predictive learning. We enforce the target with a regularizer built only from locally available statistics and without any heuristics. Using binary latents computed over a single timestep, our spiking JEPA model matches comparable continuous models on ImageNette, making it low-latency and energy-efficient.
+    Our results identify which population statistics downstream readouts favor under sparsity constraints. They suggest a unifying perspective in which rates and pairwise correlations may constrain how well circuits learn informative representations.
+    \hrule
+    %%%----------------------------------------------------------------- 
+    \vspace{10pt}
+    %%%----------------------------------------------------------------- 
+    \textbf{Additional Details.}
+
+    \emph{Central question.}
+    Joint Embedding Predictive Architectures (JEPA) learn useful representations by predicting latent embeddings
+    rather than directly predicting the input, but standard implementations rely on non-biological heuristics such as exponential
+    moving average (EMA) target encoders, stop-gradient, and teacher--student asymmetry such as in I-JEPA \cite{I-JEPA}, or statistical
+    regularizers that designed for continuous latents such as in VICReg \citep{VICReg} and LeJEPA \citep{LeJEPA}.
+    Can these heuristics be replaced by a statistical objective compatible with binary spiking outputs,
+    and can the resulting representations avoid collapse while remaining useful for downstream
+    linear and nonlinear probes? \vspace{3pt}
+
+
+    \emph{Theoretical motivation.}
+    For binary embeddings \(z\in\{0,1\}^K\) with a mean-activity budget \(\mathbb{E}[z_k]\le p_{\max}\), and we prove that for linear readouts,
+    the optimal covariance is achieved by Bernoulli(\(p_{\max}\)) variables that are pairwise independent. This gives
+    \[
+        \Sigma_{opt}=p_{\max}(1-p_{\max})I_K.
+    \]
+    Thus, the binary analogue of variance--covariance regularization is to keep each unit's mean firing rate
+    near \(p_{\max}\) and to decorrelate pairs of units.
+    This provides a principled replacement for continuous VICReg-style \citep{VICReg} regularization in spiking networks. \vspace{3pt}
+
+    \emph{Binary VICReg objective.}
+    The loss combines similarity, variance, and covariance terms:
+    \[
+        \mathcal{L}=\alpha\mathcal{L}_{\text{sim}}+\beta\mathcal{L}_{\text{var}}+\gamma\mathcal{L}_{\text{cov}},
+    \]
+    with \(\alpha=\beta=25\), \(\gamma=1\). The variance term is a hinge on per-dimension standard deviation with target
+    \(p_{\max}(1-p_{\max})\), and the covariance term penalizes off-diagonal covariances. The sparsity is directly enforced by
+    the target variance term. We denote \(p_{eff}\) the actual firing rate achieved by the network after training.
+    In the main experiments \(p_{\max}=p_{eff}=0.5\). Lower values of \(p_{eff}\) at (\(0.33\) and \(0.24\)) test sparser codes. \vspace{3pt}
+
+    \emph{Spiking model.}
+    The encoder is a ResNet-18 adapted to \(64\times64\) images, without pretraining, followed by a linear projection to 1024 dimensions.
+    The projector is a 3-layer MLP with hidden size 1024 and output size 4096. In spiking variants, a LayerNorm is followed by a leaky
+    integrate-and-fire (LIF) neuron:
+    \[
+        U[t+1]=\beta U[t]+I[t+1]-z[t]U_{\text{thres}},
+    \]
+    with \(\beta=0.9\), learnable threshold bounded in \([0.05,1.5]\), reset after spike,
+    and an arctangent surrogate gradient.
+    The current implementation uses a single time step and is effectively a neural network with Heavyside activation functions. \vspace{3pt}
+
+    \emph{Data and training.}
+    Experiments use ImageNette2-320 (10 classes; 9,469 training and 3,925 validation images). Each image is transformed into \(V=3\) global views using RandomResizedCrop (scale 0.35--1.0), horizontal flip, ColorJitter, and ImageNet normalization. Models are trained for 300 epochs with AdamW, learning rate \(10^{-3}\), weight decay 0.03, cosine schedule, and warmup. Probes are linear classifiers and \(k\)-NN (\(k=20\)) on frozen encoder features. For spiking encoders, probes are also applied to pre-spike membrane potentials.
+    \vspace{3pt}
+
+    \emph{Variants compared.}
+    Random LIF (untrained control), Supervised (ResNet-18 + linear head), VICReg (continuous), VICReg\_hyb (non-spiking encoder + spiking projector),
+    and VICReg\_bin (spiking encoder + spiking projector).
+
+    The variants and the usage probing of membrane potentials enable us to identify whether the loss
+    of performance comes from the spiking nature of the latent space or is due to a representational collapse/unhealthy learning dynamics. We restrict the
+    LIF layers to the output of encoder and projector because additional LIF layers
+    would interfere with this signal, as they are known for reducing performance, especially when using a single timestep.
+    \vspace{3pt}
+
+    \emph{Results.}
+    Top-1 accuracy (\%) on ImageNette:
+
+    \begin{table}[h]
+        \centering
+        \small
+        \caption{Top-1 accuracy (\%) on ImageNette. ``Membrane'' columns apply only to spiking encoders.}
+        \label{tab:results}
+        \begin{tabular}{lcccc}
+            \toprule
+            Model                         & Linear & \(k\)-NN & Linear (membrane) & \(k\)-NN (membrane) \\
+            Random LIF                    & 34.14  & 31.31    & 48.81             & 39.36               \\
+            Supervised                    & 90.07  & 90.37    & --                & --                  \\
+            \midrule
+            VICReg                        & 82.88  & 79.90    & --                & --                  \\
+            VICReg\_hyb, \(p_{eff}=0.5\)  & 85.66  & 83.49    & --                & --                  \\
+            VICReg\_bin, \(p_{eff}=0.5\)  & 79.72  & 83.97    & 86.39             & 83.82               \\
+            \midrule
+            VICReg\_hyb, \(p_{eff}=0.33\) & 84.69  & 81.58    & --                & --                  \\
+            VICReg\_bin, \(p_{eff}=0.33\) & 80.03  & 83.44    & 85.55             & 83.31               \\
+            \midrule
+            VICReg\_hyb, \(p_{eff}=0.24\) & 84.28  & 81.43    & --                & --                  \\
+            VICReg\_bin, \(p_{eff}=0.24\) & 78.22  & 82.01    & 84.28             & 81.83               \\
+            \bottomrule
+        \end{tabular}
+    \end{table}
+    \vspace{3pt}
+    \emph{Interpretation.}
+    Spiking variants trained with binary regularization reach performance comparable to continuous VICReg,
+    and \(k\)-NN probes are sometimes higher. Membrane probes are consistently matching or outperforming the continuous model,
+    indicating that information is largely preserved before binarization. Therefore, the remaining gap is a property
+    of the spiking code rather than a collapse of the regularizer. Lower \(p_{eff}\) reduces accuracy
+    only modestly, which is encouraging for sparse, biologically plausible codes. These results suggest
+    that a statistical binary regularizer can replace EMA/stop-gradient heuristics in JEPA-style self-supervised
+    learning for spiking neural systems.
+    \vspace{3pt}
+
+    \emph{Limitations and outlook.}
+    Results are from a single run on a small dataset with one time step.
+    Future work will test larger datasets and videos, multiple time steps,
+    action-conditioned prediction, and fully local learning rules.
+
+
+\end{NoHyper}
+%
+%%%----------------------------------------------------------------- 
+\vspace{10pt}
+%%%----------------------------------------------------------------- 
+%
+\cite{I-JEPA}~\href{https://arxiv.org/abs/2301.08243}{Assran \& al, 2023};
+\cite{VICReg}~\href{https://arxiv.org/abs/2105.04906}{Bardes \& al, 2022};
+\cite{LeJEPA}~\href{https://arxiv.org/abs/2511.08544}{Balestriero \& al, 2025}
+\end{document}
+
