@@ -62,7 +62,7 @@
     \hrule
     \vspace{3pt}
     Cortical circuits learn from mostly unlabeled input, a regime that self-supervised models such as joint embedding predictive architectures (JEPA) capture by predicting the latent representation of one view from another. These models can fail through representational collapse, where activity becomes the same for all inputs. Thus, a circuit that learns without labels needs a mechanism that keeps population activity informative using only locally available information. Existing solutions are either heuristic (stop-gradient, moving-average teachers), unstable and without mathematical guarantees, or statistical regularizers whose optimality arguments are built for continuous activity and do not directly apply to discrete spikes. Therefore, it remains unclear whether collapse can be avoided in spiking populations using only locally available statistics.
-    We approach the problem mathematically. For linear decoding, the first and second moments of the latent code determine how well a downstream decoder can perform, so the optimal code can be characterized entirely at the level of these statistics. Existing regularizers such as VICReg act on exactly these statistics. We prove that this optimality extends to binary latents under a sparsity constraint, and that the optimum is reached if and only if units are mutually uncorrelated and fire at the same rate. Our analysis shows that the same statistics can prevent collapse in self-supervised predictive learning. We enforce the target with a regularizer built only from locally available statistics and without any heuristics. Using binary latents computed over a single timestep, our spiking JEPA model matches comparable continuous models on ImageNette, making it low-latency and energy-efficient.
+    We approach the problem mathematically. For linear decoding, the first and second moments of the latent code determine how well a downstream decoder can perform, so the optimal code can be characterized entirely at the level of these statistics. Existing regularizers such as VICReg act on exactly these statistics. We prove that this optimality extends to binary latents under a sparsity constraint, and that the optimum is reached if and only if units are mutually uncorrelated and fire at the same rate, which can be achieved using homeostasis and lateral interactions. Our analysis shows that the same statistics can prevent collapse in self-supervised predictive learning. We enforce the target with a regularizer built only from locally available statistics and without any heuristics. Using binary latents computed over a single timestep, our spiking JEPA model matches comparable continuous models on ImageNette, making it low-latency and energy-efficient.
     Our results identify which population statistics downstream readouts favor under sparsity constraints. They suggest a unifying perspective in which rates and pairwise correlations may constrain how well circuits learn informative representations.
     \hrule
     %%%----------------------------------------------------------------- 
@@ -87,7 +87,8 @@
         \Sigma_{opt}=p_{\max}(1-p_{\max})I_K.
     \]
     Thus, the binary analogue of variance--covariance regularization is to keep each unit's mean firing rate
-    near \(p_{\max}\) and to decorrelate pairs of units.
+    near \(p_{\max}\) and to decorrelate pairs of units. Both of those statistics are available locally, at the neuron level or through lateral connections.
+    They are achievable through homeostasis and lateral interactions, and have been shown to keep representations informative \citep{Foldiak} \citep{Grimaldi}.
     This provides a principled replacement for continuous VICReg-style \citep{VICReg} regularization in spiking networks. \vspace{3pt}
 
     \emph{Binary VICReg objective.}
@@ -177,5 +178,7 @@
 \cite{I-JEPA}~\href{https://arxiv.org/abs/2301.08243}{Assran \& al, 2023};
 \cite{VICReg}~\href{https://arxiv.org/abs/2105.04906}{Bardes \& al, 2022};
 \cite{LeJEPA}~\href{https://arxiv.org/abs/2511.08544}{Balestriero \& al, 2025}
+\cite{Foldiak}~\href{https://www.researchgate.net/publication/304541412_Forming_sparse_representations_by_local_anti-Hebbian_learning}{Földiák, 1990}
+\cite{Grimaldi}~\href{https://laurentperrinet.github.io/publication/grimaldi-21-cbmi/}{Grimaldi, 2021}
 \end{document}
 
