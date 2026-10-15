@@ -98,8 +98,8 @@
     \]
     with \(\alpha=\beta=25\), \(\gamma=1\). The variance term is a hinge on per-dimension standard deviation with target
     \(p_{\max}(1-p_{\max})\), and the covariance term penalizes off-diagonal covariances. The sparsity is directly enforced by
-    the target variance term. We denote \(p_{eff}\) the actual firing rate achieved by the network after training.
-    In the main experiments \(p_{\max}=p_{eff}=0.5\). Lower values of \(p_{eff}\) at (\(0.33\) and \(0.24\)) test sparser codes. \vspace{3pt}
+    the target variance term. We denote \(p_{\text{eff}}\) the actual firing rate achieved by the network after training.
+    In the main experiments \(p_{\max}=p_{\text{eff}}=0.5\). Lower values of \(p_{\text{eff}}\) at (\(0.33\) and \(0.24\)) test sparser codes. \vspace{3pt}
 
     \emph{Spiking model.}
     The encoder is a ResNet-18 adapted to \(64\times64\) images, without pretraining, followed by a linear projection to 1024 dimensions.
@@ -141,14 +141,14 @@
             Supervised                    & 90.07  & 90.37    & --                & --                  \\
             \midrule
             VICReg                        & 82.88  & 79.90    & --                & --                  \\
-            VICReg\_hyb, \(p_{eff}=0.5\)  & 85.66  & 83.49    & --                & --                  \\
-            VICReg\_bin, \(p_{eff}=0.5\)  & 79.72  & 83.97    & 86.39             & 83.82               \\
+            VICReg\_hyb, \(p_{\text{eff}}=0.5\)  & 85.66  & 83.49    & --                & --                  \\
+            VICReg\_bin, \(p_{\text{eff}}=0.5\)  & 79.72  & 83.97    & 86.39             & 83.82               \\
             \midrule
-            VICReg\_hyb, \(p_{eff}=0.33\) & 84.69  & 81.58    & --                & --                  \\
-            VICReg\_bin, \(p_{eff}=0.33\) & 80.03  & 83.44    & 85.55             & 83.31               \\
+            VICReg\_hyb, \(p_{\text{eff}}=0.33\) & 84.69  & 81.58    & --                & --                  \\
+            VICReg\_bin, \(p_{\text{eff}}=0.33\) & 80.03  & 83.44    & 85.55             & 83.31               \\
             \midrule
-            VICReg\_hyb, \(p_{eff}=0.24\) & 84.28  & 81.43    & --                & --                  \\
-            VICReg\_bin, \(p_{eff}=0.24\) & 78.22  & 82.01    & 84.28             & 81.83               \\
+            VICReg\_hyb, \(p_{\text{eff}}=0.24\) & 84.28  & 81.43    & --                & --                  \\
+            VICReg\_bin, \(p_{\text{eff}}=0.24\) & 78.22  & 82.01    & 84.28             & 81.83               \\
             \bottomrule
         \end{tabular}
     \end{table}
@@ -157,7 +157,7 @@
     Spiking variants trained with binary regularization reach performance comparable to continuous VICReg,
     and \(k\)-NN probes are sometimes higher. Membrane probes are consistently matching or outperforming the continuous model,
     indicating that information is largely preserved before binarization. Therefore, the remaining gap is a property
-    of the spiking code rather than a collapse of the regularizer. Lower \(p_{eff}\) reduces accuracy
+    of the spiking code rather than a collapse of the regularizer. Lower \(p_{\text{eff}}\) reduces accuracy
     only modestly, which is encouraging for sparse, biologically plausible codes. These results suggest
     that a statistical binary regularizer can replace EMA/stop-gradient heuristics in JEPA-style self-supervised
     learning for spiking neural systems.
