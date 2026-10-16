@@ -79,10 +79,9 @@
     and can the resulting representations avoid collapse while remaining useful for downstream
     linear and nonlinear probes? \vspace{3pt}
 
-
     \emph{Theoretical motivation.}
-    For binary embeddings \(z\in\{0,1\}^K\) with a mean-activity budget \(\mathbb{E}[z_k]\le p_{\max}\), and we prove that for linear readouts,
-    the optimal covariance is achieved by Bernoulli(\(p_{\max}\)) variables that are pairwise independent. This gives
+    For binary embeddings \(z\in \{0,1\}^{K}\) with a total activity budget \(\sum_{k=1}^{K}\mathbb{E}[z_k]\leq K p_{\max}\),
+    we prove that for linear readouts, the optimal covariance is achieved by Bernoulli(\(p_{\max}\)) variables that are pairwise independent. This gives
     \[
         \Sigma_{opt}=p_{\max}(1-p_{\max})I_K.
     \]
